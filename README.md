@@ -35,12 +35,11 @@ button{margin:.25rem .5rem .25rem 0}
   <h3>Sala: <span id="roomCode"></span></h3>
   <button id="btnReady" class="btn btn-success btn-sm">PRONTO</button>
   <button id="btnLeave" class="btn btn-outline-danger btn-sm">SAIR</button>
-  <!-- NOVO: Botões adicionais -->
   <button id="btnStatus" class="btn btn-info btn-sm">Mostrar Tudo</button>
   <button id="btnAcess" class="btn btn-warning btn-sm">Acessibilidade</button>
 </div>
 
-<!-- ───────── LISTA DE JOGADORES (visível sempre) ───────── -->
+<!-- ───────── LISTA DE JOGADORES ───────── -->
 <div id="playersWrap" style="display:none">
   <h4>Jogadores</h4>
   <section id="players"></section>
@@ -72,18 +71,17 @@ const revealedByPid = {};
 const nameToPid     = {};
 let   playersState  = {};
 
-// NOVO: Mostrar status no console
+// Mostrar status no console
 document.getElementById('btnStatus').onclick = () => {
   console.log("🚨 Status completo do jogo:", { playersState, myHand, roomId, pid });
   alert("Status do jogo foi exibido no console.");
 };
 
-// NOVO: Alternar modo de acessibilidade
+// Alternar modo de acessibilidade
 document.getElementById('btnAcess').onclick = () => {
   document.body.classList.toggle('high-contrast');
 };
 
-// Reconexão automática
 const sRoom = localStorage.getItem('coup_room');
 const sPid  = localStorage.getItem('coup_pid');
 if (sRoom && sPid) connectWS({roomId:sRoom, pid:sPid});
@@ -123,6 +121,7 @@ document.getElementById('btnReady').onclick = () => {
   send({type:'ready', ready:myReady});
   toggleReadyBtn();
 };
+
 function toggleReadyBtn(){
   const b=document.getElementById('btnReady');
   b.classList.toggle('btn-success',!myReady);
@@ -130,10 +129,14 @@ function toggleReadyBtn(){
   b.textContent=myReady?'Cancelado':'PRONTO';
 }
 
-document.getElementById('add').onclick =()=>send({type:'coinDelta',delta:1});
+document.getElementById('add').onclick =()=>{ send({type:'coinDelta',delta:1}); playSound('coin.mp3'); };
 document.getElementById('rem').onclick =()=>send({type:'coinDelta',delta:-1});
 document.getElementById('lose').onclick   =()=>beginSelect('lose','Escolha a carta a perder');
-document.getElementById('reveal').onclick =()=>beginSelect('reveal','Clique na carta para revelar');
+document.getElementById('reveal').onclick =()=>{
+  send({type:'revealCard'}); 
+  playSound('reveal.mp3');
+  playSound('voice-perdeuduque.mp3');
+};
 document.getElementById('amb').onclick    =()=>send({type:'ambassadorDraw'});
 
 function handle(m){
@@ -157,11 +160,10 @@ function handle(m){
 }
 
 function beginSelect(newMode,msg){ mode=newMode; pending=[]; setInfo(msg); highlight(true); }
+
 function cardClick(card,img){
   if(!mode) {
-    // NOVO: tocar áudio ao clicar na carta
-    const audio = new Audio(`/audios/${card}.mp3`);
-    audio.play().catch(()=>{});
+    playSound(`${card}.mp3`);
     return;
   }
   if(['lose','reveal'].includes(mode)){
@@ -171,6 +173,7 @@ function cardClick(card,img){
   else if(pending.length<2){ img.classList.add('sel'); pending.push(card); }
   if(pending.length===2){ send({type:'ambassadorReturn',return:pending}); clearMode(); }
 }
+
 function clearMode(){ mode=null; pending=[]; setInfo(''); highlight(false);}
 function highlight(on){document.querySelectorAll('#hand .card').forEach(el=>{el.classList.remove('sel');el.style.cursor=on?'pointer':'default';});}
 
@@ -183,6 +186,7 @@ function renderHand(){
     box.appendChild(img);
   });
 }
+
 function renderPlayers(players){
   const area=document.getElementById('players'); area.innerHTML='';
   Object.entries(players).forEach(([id,p])=>{
@@ -203,12 +207,14 @@ function renderPlayers(players){
   });
   playersState = players;
 }
+
 function updateCoins(id,val){
   const span=document.querySelector(`[data-pid="${id}"] .coins`);
   if(span) span.textContent=val;
   if(playersState[id]) playersState[id].coins=val;
   if(id===pid) document.getElementById('me').textContent=`${myName} – moedas: ${val}`;
 }
+
 function updateCards(id,cards,alive){
   const wrap=document.querySelector(`[data-pid="${id}"]`);
   if(wrap){
@@ -217,7 +223,9 @@ function updateCards(id,cards,alive){
   }
   if(playersState[id]){ playersState[id].cards=cards; playersState[id].alive=alive; }
 }
+
 function resetHistory(){ document.getElementById('history').innerHTML=''; document.getElementById('histTitle').style.display='none';}
+
 function addHistory(e){
   const h = document.getElementById('history');
   h.insertAdjacentHTML('beforeend',
@@ -233,6 +241,7 @@ function addHistory(e){
   if(!arr.includes(card)) arr.push(card);
   renderPlayers(playersState);
 }
+
 function send(o){ ws&&ws.readyState===1&&ws.send(JSON.stringify(o)); }
 function setInfo(t){ document.getElementById('info').textContent=t; }
 function showLobby(){
@@ -246,5 +255,20 @@ function showGame(){
   document.getElementById('lobby').style.display='block';
   document.getElementById('playersWrap').style.display='block';
 }
+
+// ───── FUNÇÕES DE ÁUDIO ─────
+function playSound(filename) {
+  const audio = new Audio(`/audios/${filename}`);
+  audio.play().catch(()=>{});
+}
+
+function suaVez() {
+  playSound('voice-suavez.mp3');
+}
+
+window.addEventListener('load', () => {
+  playSound('voice-bemvindo.mp3');
+  playSound('enter.mp3');
+});
 </script>
 @endsection
